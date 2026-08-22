@@ -1,105 +1,189 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { colors, space, type as t } from '../../theme';
-import { Button, Card, Empty, Label, Pill } from '../../components/ui';
+import { Button, Card, Empty, Label } from '../../components/ui';
+import { HeaderBalance } from '../../components/HeaderBalance';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PoolBar } from '../../components/PoolBar';
+import { CloseDate, MyPosition, StatusRow } from '../../components/PollParts';
 import { BetSheet } from '../../components/BetSheet';
-import { Chat } from '../../components/Chat';
-import { useStore } from '../../lib/mock/store';
-import { effectiveStatus, statusLabel } from '../../lib/domain/poll';
-import { estimatedPayout, totalPool, type Side } from '../../lib/domain/market';
-import { displayName } from '../../lib/mock/data';
-import { points, shortDate, timeLeft } from '../../lib/format';
+import { ChatMessages, ChatComposer } from '../../components/Chat';
+import { PollDetailSkeleton } from '../../components/Skeleton';
+import { usePoll, poolOf, placeBet, proposeOutcome } from '../../lib/predictions';
+import { nameOf } from '../../lib/profiles';
+import { effectiveStatus } from '../../lib/domain/poll';
+import { estimatedMultiplier, totalPool, type Side } from '../../lib/domain/market';
+import { timeLeft } from '../../lib/format';
 
 export default function PollDetail() {
   const { pollId } = useLocalSearchParams<{ pollId: string }>();
-  const { state, poolOf, myBet, balance, dispatch, me, isAdmin } = useStore();
+  const router = useRouter();
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
+  const {
+    poll,
+    bets,
+    messages,
+    balance,
+    names,
+    myBet: mine,
+    userId,
+    status: loadStatus,
+    error: loadError,
+    refresh,
+  } = usePoll(pollId);
   const [sheetSide, setSheetSide] = useState<Side | null>(null);
+  // La hoja se va animada, así que sigue en pantalla un rato después de que
+  // `sheetSide` vuelve a null: mientras baja necesita saber a qué lado era.
+  const lastSide = useRef<Side>('YES');
+  if (sheetSide) lastSide.current = sheetSide;
+  const openSide = sheetSide ?? lastSide.current;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const poll = state.polls.find((p) => p.id === pollId);
-  if (!poll) return <Empty title="Esta predicción ya no existe." />;
+  // Header propio en vez del nativo: es lo que hace que la burbuja del saldo se
+  // vea igual acá que en "Inicio". El porqué está en components/ScreenHeader.
+  // El saldo va puesto desde el primer frame, con su hueso mientras carga: si
+  // apareciera recién con los datos, el header saltaría.
+  const chrome = (
+    <ScreenHeader
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      right={<HeaderBalance balance={balance} loading={loadStatus === 'loading'} />}
+    />
+  );
 
-  const pool = poolOf(poll.id);
-  const mine = myBet(poll.id);
-  const status = effectiveStatus(poll.status, poll.bettingClosesAt);
-  const left = timeLeft(poll.bettingClosesAt);
-  const bal = balance(poll.groupId);
+  if (loadStatus === 'loading') {
+    return (
+      <View style={styles.fill}>
+        {chrome}
+        <PollDetailSkeleton />
+      </View>
+    );
+  }
+  if (loadStatus === 'error') {
+    return (
+      <View style={styles.fill}>
+        {chrome}
+        <Empty title="No pudimos cargar la predicción." hint={loadError ?? undefined} />
+      </View>
+    );
+  }
+  if (!poll) {
+    return (
+      <View style={styles.fill}>
+        {chrome}
+        <Empty title="Esta predicción ya no existe." />
+      </View>
+    );
+  }
+
+  const pool = poolOf(bets);
+  const status = effectiveStatus(poll.status, poll.betting_closes_at);
+  const left = timeLeft(poll.betting_closes_at);
   const canBet = status === 'OPEN';
-  const myPayout = mine ? estimatedPayout(pool, mine.side, 0, mine.amount) : 0;
+  // Sin saldo no hay nada que apostar: ni abrir la primera posición ni sumarle
+  // puntos a la que ya tenés. El botón se apaga acá para no ofrecer algo que
+  // la RPC va a rechazar igual.
+  const broke = balance <= 0;
 
   function open(side: Side) {
     // no se puede cambiar de lado (§4.2)
     if (mine && mine.side !== side) return;
+    if (broke) return;
+    setActionError(null);
     setSheetSide(side);
+  }
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await action();
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'No pudimos completar la acción.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={styles.fill}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // Con el header nativo apagado, `useHeaderHeight()` da 0 y el padre del
+      // KeyboardAvoidingView arranca arriba de todo, así que no hay header que
+      // restar. Queda la resta del inset de abajo, que ya lo pone el
+      // compositor: sin eso quedaría el hueco del home indicator entre el campo
+      // y el teclado. La cuenta se deja escrita entera para que siga dando bien
+      // si algún día el header vuelve a ser el nativo.
+      keyboardVerticalOffset={headerHeight - insets.bottom}
     >
+      {chrome}
+
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{poll.title}</Text>
+        <View style={styles.head}>
+          <Text style={styles.title}>{poll.title}</Text>
+          <CloseDate iso={poll.betting_closes_at} />
+        </View>
         {poll.description && <Text style={styles.desc}>{poll.description}</Text>}
 
-        <View style={styles.metaRow}>
-          {status === 'OPEN' && left ? (
-            <Text style={styles.time}>Cierra en {left}</Text>
-          ) : (
-            <Pill
-              text={statusLabel[status]}
-              tone={status === 'RESOLVED_YES' ? 'yes' : status === 'RESOLVED_NO' ? 'no' : 'neutral'}
-            />
-          )}
-          <Text style={styles.time}>{shortDate(poll.bettingClosesAt)}</Text>
-        </View>
+        <Card style={{ gap: space.md }}>
+          <StatusRow status={status} left={left} pool={totalPool(pool)} />
 
-        <Card style={{ gap: space.lg }}>
-          <View style={styles.potRow}>
-            <Label>Pozo</Label>
-            <Text style={styles.pot}>{points(totalPool(pool))} pts</Text>
-          </View>
-
-          <PoolBar pool={pool} myside={mine?.side} />
+          <PoolBar pool={pool} />
 
           {mine && (
-            <View style={styles.position}>
-              <Text style={styles.positionText}>
-                Tu apuesta: {points(mine.amount)} a{' '}
-                <Text style={{ fontWeight: '700', color: mine.side === 'YES' ? colors.yes : colors.no }}>
-                  {mine.side === 'YES' ? 'SÍ' : 'NO'}
-                </Text>
-              </Text>
-              <Text style={styles.positionText}>
-                Si ganás cobrás ~{points(myPayout)} pts
-              </Text>
-            </View>
+            <MyPosition
+              side={mine.side}
+              amount={mine.amount}
+              multiplier={estimatedMultiplier(pool, mine.side, 0, mine.amount)}
+            />
           )}
+
+          {actionError && <Text style={styles.actionError}>{actionError}</Text>}
 
           {canBet ? (
             <>
-              <View style={styles.actions}>
+              {/*
+                No se puede cambiar de lado (§4.2), así que una vez que hay
+                posición el otro botón no va a andar nunca más. Desteñido se
+                lee como algo que se podría tocar y no responde: mejor que
+                desaparezca y quede uno solo, del color del lado ya elegido,
+                que dice lo único que se puede hacer —sumarle puntos.
+              */}
+              {mine ? (
                 <Button
-                  title={mine?.side === 'NO' ? 'SÍ bloqueado' : 'Apostar SÍ'}
-                  tone="yes"
-                  disabled={mine?.side === 'NO'}
-                  style={{ flex: 1 }}
-                  onPress={() => open('YES')}
+                  title={`Sumar puntos al ${mine.side === 'YES' ? 'SÍ' : 'NO'}`}
+                  tone={mine.side === 'YES' ? 'yes' : 'no'}
+                  disabled={broke || busy}
+                  onPress={() => open(mine.side)}
                 />
-                <Button
-                  title={mine?.side === 'YES' ? 'NO bloqueado' : 'Apostar NO'}
-                  tone="no"
-                  disabled={mine?.side === 'YES'}
-                  style={{ flex: 1 }}
-                  onPress={() => open('NO')}
-                />
-              </View>
-              <Text style={styles.balanceHint}>Saldo disponible: {points(bal)} pts</Text>
-              {mine && (
-                <Text style={styles.balanceHint}>
-                  Ya estás del lado {mine.side === 'YES' ? 'SÍ' : 'NO'}: podés sumar más puntos,
-                  no cambiar de lado.
+              ) : (
+                <View style={styles.actions}>
+                  <Button
+                    title="Apostar SÍ"
+                    tone="yes"
+                    disabled={broke || busy}
+                    style={{ flex: 1 }}
+                    onPress={() => open('YES')}
+                  />
+                  <Button
+                    title="Apostar NO"
+                    tone="no"
+                    disabled={broke || busy}
+                    style={{ flex: 1 }}
+                    onPress={() => open('NO')}
+                  />
+                </View>
+              )}
+              {broke && (
+                <Text style={styles.closed}>
+                  Te quedaste sin puntos. Vas a poder apostar de nuevo cuando cobres una
+                  predicción.
                 </Text>
               )}
             </>
@@ -116,7 +200,7 @@ export default function PollDetail() {
           )}
         </Card>
 
-        {status === 'LOCKED' && poll.creatorId === me && (
+        {status === 'LOCKED' && poll.creator_id === userId && (
           <Card style={{ gap: space.md }}>
             <Label>Ya pasó el evento</Label>
             <Text style={styles.desc}>
@@ -127,64 +211,63 @@ export default function PollDetail() {
                 title="Pasó: SÍ"
                 tone="yes"
                 style={{ flex: 1 }}
-                onPress={() => dispatch({ type: 'PROPOSE_OUTCOME', pollId: poll.id, outcome: 'YES' })}
+                disabled={busy}
+                onPress={() => run(() => proposeOutcome(poll.id, 'YES'))}
               />
               <Button
                 title="No pasó: NO"
                 tone="no"
                 style={{ flex: 1 }}
-                onPress={() => dispatch({ type: 'PROPOSE_OUTCOME', pollId: poll.id, outcome: 'NO' })}
+                disabled={busy}
+                onPress={() => run(() => proposeOutcome(poll.id, 'NO'))}
               />
             </View>
           </Card>
         )}
 
-        {poll.subjectIds.length > 0 && (
+        {poll.subject_ids.length > 0 && (
           <Text style={styles.subjects}>
-            Involucra a {poll.subjectIds.map(displayName).join(', ')}
+            Involucra a {poll.subject_ids.map((id) => nameOf(names, id)).join(', ')}
           </Text>
         )}
 
-        <Text style={styles.chatHeading}>Comentarios</Text>
-        <Chat pollId={poll.id} />
+        <View style={styles.chatHeading}>
+          <Label>Comentarios</Label>
+        </View>
+        <ChatMessages messages={messages} names={names} userId={userId} />
       </ScrollView>
 
-      {sheetSide && (
-        <BetSheet
-          visible
-          side={sheetSide}
-          pool={pool}
-          balance={bal}
-          currentStake={mine?.side === sheetSide ? mine.amount : 0}
-          onClose={() => setSheetSide(null)}
-          onConfirm={(amount) => {
-            dispatch({ type: 'PLACE_BET', pollId: poll.id, side: sheetSide, amount });
-            setSheetSide(null);
-          }}
-        />
-      )}
+      {/* Fuera del scroll: así el campo y el botón de enviar quedan siempre
+          justo arriba del teclado, sin tener que bajarlo para mandar. */}
+      <View style={{ paddingBottom: insets.bottom }}>
+        <ChatComposer pollId={poll.id} onSent={refresh} />
+      </View>
+
+      <BetSheet
+        visible={!!sheetSide}
+        side={openSide}
+        pool={pool}
+        balance={balance}
+        currentStake={mine?.side === openSide ? mine.amount : 0}
+        onClose={() => setSheetSide(null)}
+        onConfirm={(amount) => {
+          setSheetSide(null);
+          void run(() => placeBet(poll.id, openSide, amount));
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
-  title: { ...t.title, fontSize: 24, color: colors.ink, lineHeight: 31 },
-  desc: { ...t.body, color: colors.muted, lineHeight: 21 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { ...t.body, fontSize: 13, color: colors.muted },
-  potRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  pot: { ...t.pointsBig, color: colors.ink },
-  position: {
-    backgroundColor: colors.surfaceAlt,
-    padding: space.md,
-    borderRadius: 8,
-    gap: 3,
-  },
-  positionText: { ...t.body, fontSize: 13, color: colors.ink },
+  head: { gap: 2 },
+  title: { ...t.h1, color: colors.ink },
+  desc: { ...t.body, color: colors.muted },
   actions: { flexDirection: 'row', gap: space.sm },
-  balanceHint: { ...t.body, fontSize: 12, color: colors.muted },
-  closed: { ...t.body, fontSize: 13, color: colors.muted },
-  subjects: { ...t.body, fontSize: 12, color: colors.muted },
-  chatHeading: { ...t.label, color: colors.muted, marginTop: space.lg, textTransform: 'uppercase' },
+  actionError: { ...t.small, color: colors.danger },
+  closed: { ...t.small, color: colors.muted },
+  subjects: { ...t.small, fontSize: 12, color: colors.faint },
+  chatHeading: { marginTop: space.lg },
 });

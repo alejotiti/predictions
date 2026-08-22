@@ -18,10 +18,22 @@ export function timeLeft(iso: string, now = Date.now()): string | null {
   return `${days} d`;
 }
 
+/** Cierre en corto, como va debajo del título de una predicción: 22/8, 2:06 p. m. */
 export function shortDate(iso: string): string {
   return new Date(iso).toLocaleString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
+    day: 'numeric',
+    month: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/** Fecha y hora completas para elegir el cierre de una predicción. */
+export function longDateTime(date: Date): string {
+  return date.toLocaleString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
     hour: '2-digit',
     minute: '2-digit',
   });

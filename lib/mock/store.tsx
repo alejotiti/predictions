@@ -24,6 +24,7 @@ import {
   ME,
   type Bet,
   type Group,
+  type GroupPrivacy,
   type Member,
   type Message,
   type Poll,
@@ -58,7 +59,7 @@ type Action =
   | { type: 'RESOLVE_POLL'; pollId: string; outcome: 'YES' | 'NO' | 'VOID' }
   | { type: 'SEND_MESSAGE'; pollId: string; body: string }
   | { type: 'JOIN_GROUP'; inviteCode: string }
-  | { type: 'CREATE_GROUP'; name: string };
+  | { type: 'CREATE_GROUP'; id: string; name: string; description?: string; privacy: GroupPrivacy };
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -205,8 +206,10 @@ function reducer(state: State, action: Action): State {
 
     case 'CREATE_GROUP': {
       const group: Group = {
-        id: uid('g'),
+        id: action.id,
         name: action.name,
+        description: action.description,
+        privacy: action.privacy,
         inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
       };
       return {
@@ -259,6 +262,10 @@ type Api = {
   state: State;
   me: string;
   dispatch: React.Dispatch<Action>;
+  /** Devuelve el id del grupo nuevo para poder entrar directo, como haría el RPC. */
+  createGroup: (input: { name: string; description?: string; privacy?: GroupPrivacy }) => string;
+  /** Devuelve el id del grupo, o null si el código no existe. */
+  joinGroup: (inviteCode: string) => string | null;
   balance: (groupId: string, userId?: string) => number;
   roleIn: (groupId: string, userId?: string) => Member['role'] | undefined;
   isAdmin: (groupId: string, userId?: string) => boolean;
@@ -284,6 +291,25 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
       state,
       me: ME,
       dispatch,
+      createGroup: ({ name, description, privacy = 'private' }) => {
+        const id = uid('g');
+        const desc = description?.trim();
+        dispatch({
+          type: 'CREATE_GROUP',
+          id,
+          name: name.trim(),
+          description: desc || undefined,
+          privacy,
+        });
+        return id;
+      },
+      joinGroup: (inviteCode) => {
+        const code = inviteCode.trim().toUpperCase();
+        const group = state.groups.find((g) => g.inviteCode.toUpperCase() === code);
+        if (!group) return null;
+        dispatch({ type: 'JOIN_GROUP', inviteCode: code });
+        return group.id;
+      },
       balance,
       roleIn,
       isAdmin: (groupId, userId = ME) => {

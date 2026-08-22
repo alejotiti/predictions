@@ -1,58 +1,89 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors, space, type as t } from '../../../theme';
+import { useLayoutEffect, useState } from 'react';
+import { Text, ScrollView, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
+import { useNavigation, useRouter } from 'expo-router';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { colors, radius, space, type as t } from '../../../theme';
 import { Button, Card, Label } from '../../../components/ui';
-import { useStore } from '../../../lib/mock/store';
-import { displayName } from '../../../lib/mock/data';
+import { HeaderBalance } from '../../../components/HeaderBalance';
+import { createPoll, useGroupBalance } from '../../../lib/predictions';
+import { useGroupId } from '../../../lib/groups';
+import { longDateTime } from '../../../lib/format';
 
-const CLOSE_OPTIONS = [
-  { label: '3 horas', hours: 3 },
-  { label: '12 horas', hours: 12 },
-  { label: '1 día', hours: 24 },
-  { label: '3 días', hours: 72 },
-  { label: '1 semana', hours: 168 },
-];
+/** El árbitro tiene 24 h desde el cierre para aceptar o negar lo que dice el creador. */
+const REVIEW_HOURS = 24;
 
 export default function CreatePoll() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
+  const groupId = useGroupId();
   const router = useRouter();
-  const { membersOf, dispatch, me } = useStore();
-
+  const navigation = useNavigation();
+  // Esta pantalla no muestra ningún otro dato del ledger, pero el saldo va
+  // arriba a la derecha en todas (DESIGN.md), así que lo pide sólo para eso.
+  const { balance, status: balanceStatus } = useGroupBalance(groupId);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [closeIn, setCloseIn] = useState(24);
-  const [resolveIn, setResolveIn] = useState(72);
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [closesAt, setClosesAt] = useState(() => new Date(Date.now() + 24 * 3600_000));
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const others = membersOf(groupId).filter((m) => m.userId !== me);
-  const valid = title.trim().length > 3 && resolveIn >= closeIn;
+  const outcomeAt = new Date(closesAt.getTime() + REVIEW_HOURS * 3600_000);
+  const future = closesAt.getTime() > Date.now();
+  const valid = !!groupId && title.trim().length > 3 && future;
 
-  function toggle(userId: string) {
-    setSubjects((s) => (s.includes(userId) ? s.filter((x) => x !== userId) : [...s, userId]));
-  }
+  // Las opciones del header las pone el layout de las pestañas, así que el
+  // saldo se agrega desde acá, igual que en el feed.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <HeaderBalance balance={balance} loading={balanceStatus === 'loading'} />
+      ),
+    });
+  }, [navigation, balance, balanceStatus]);
 
-  function submit() {
-    const now = Date.now();
-    dispatch({
-      type: 'CREATE_POLL',
-      poll: {
-        id: `p_${Math.random().toString(36).slice(2, 8)}`,
-        groupId,
-        creatorId: me,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        status: 'PENDING_APPROVAL',
-        bettingClosesAt: new Date(now + closeIn * 3600_000).toISOString(),
-        outcomeDeadline: new Date(now + resolveIn * 3600_000).toISOString(),
-        createdAt: new Date().toISOString(),
-        subjectIds: subjects,
+  function openPicker() {
+    if (Platform.OS !== 'android') {
+      setPickerOpen((open) => !open);
+      return;
+    }
+    // En Android el sistema pide fecha y hora en dos pasos.
+    DateTimePickerAndroid.open({
+      value: closesAt,
+      mode: 'date',
+      minimumDate: new Date(),
+      onChange: (event, date) => {
+        if (event.type !== 'set' || !date) return;
+        DateTimePickerAndroid.open({
+          value: date,
+          mode: 'time',
+          is24Hour: true,
+          onChange: (timeEvent, withTime) => {
+            if (timeEvent.type === 'set' && withTime) setClosesAt(withTime);
+          },
+        });
       },
     });
-    setTitle('');
-    setDescription('');
-    setSubjects([]);
-    router.push(`/group/${groupId}`);
+  }
+
+  async function submit() {
+    if (!groupId) return;
+    setSending(true);
+    setError(null);
+    try {
+      await createPoll({
+        groupId,
+        title,
+        description,
+        closesAt,
+        outcomeDeadline: outcomeAt,
+      });
+      setTitle('');
+      setDescription('');
+      router.push(`/group/${groupId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No pudimos crear la predicción.');
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -63,7 +94,7 @@ export default function CreatePoll() {
           value={title}
           onChangeText={setTitle}
           placeholder="Ej: El Pelado se saca 10 en el escrito"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.faint}
           style={styles.input}
           multiline
         />
@@ -72,72 +103,53 @@ export default function CreatePoll() {
           value={description}
           onChangeText={setDescription}
           placeholder="Qué cuenta como SÍ y qué cuenta como NO"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.faint}
           style={[styles.input, { minHeight: 70 }]}
           multiline
         />
       </Card>
 
       <Card style={{ gap: space.md }}>
-        <Label>Involucrados</Label>
-        <Text style={styles.hint}>
-          Quién aparece en la predicción. El árbitro lo usa para ver si alguien puede
-          decidir el resultado a propósito.
-        </Text>
-        <View style={styles.chips}>
-          {others.map((m) => {
-            const on = subjects.includes(m.userId);
-            return (
-              <Pressable
-                key={m.userId}
-                onPress={() => toggle(m.userId)}
-                style={[styles.chip, on && styles.chipOn]}
-              >
-                <Text style={[styles.chipText, on && { color: '#fff' }]}>
-                  {displayName(m.userId)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
-
-      <Card style={{ gap: space.md }}>
-        <Label>Las apuestas cierran en</Label>
-        <Options value={closeIn} onChange={setCloseIn} />
-        <Label>El resultado se sabe antes de</Label>
-        <Options value={resolveIn} onChange={setResolveIn} />
-        {resolveIn < closeIn && (
-          <Text style={styles.error}>
-            El resultado no puede vencer antes de que cierren las apuestas.
-          </Text>
+        <Label>Las apuestas cierran</Label>
+        <Pressable onPress={openPicker} style={styles.picker}>
+          <Text style={styles.pickerText}>{longDateTime(closesAt)}</Text>
+        </Pressable>
+        {pickerOpen && Platform.OS !== 'android' && (
+          <DateTimePicker
+            value={closesAt}
+            mode="datetime"
+            display="inline"
+            locale="es-AR"
+            minimumDate={new Date()}
+            // El calendario se pinta solo según el modo del celular: con el
+            // teléfono en oscuro escribe en blanco sobre nuestro papel claro y
+            // no se lee nada. La app es clara siempre, así que el picker también.
+            themeVariant="light"
+            accentColor={colors.ink}
+            textColor={colors.ink}
+            onChange={(_event, date) => date && setClosesAt(date)}
+          />
         )}
+        {!future && (
+          <Text style={styles.error}>El cierre tiene que ser más adelante que ahora.</Text>
+        )}
+        <Text style={styles.hint}>
+          El resultado se sabe {REVIEW_HOURS} h después del cierre: ese es el tiempo que tiene
+          el árbitro para aceptar o negar lo que diga el creador. Vence el{' '}
+          {longDateTime(outcomeAt)}.
+        </Text>
       </Card>
 
       <Text style={styles.hint}>
         Al enviarla queda esperando la aprobación del árbitro. Hasta entonces nadie puede apostar.
       </Text>
-      <Button title="Enviar al árbitro" onPress={submit} disabled={!valid} />
+      {error && <Text style={styles.error}>{error}</Text>}
+      <Button
+        title={sending ? 'Creando…' : 'Crear predicción'}
+        onPress={submit}
+        disabled={!valid || sending}
+      />
     </ScrollView>
-  );
-}
-
-function Options({ value, onChange }: { value: number; onChange: (h: number) => void }) {
-  return (
-    <View style={styles.chips}>
-      {CLOSE_OPTIONS.map((o) => {
-        const on = o.hours === value;
-        return (
-          <Pressable
-            key={o.label}
-            onPress={() => onChange(o.hours)}
-            style={[styles.chip, on && styles.chipOn]}
-          >
-            <Text style={[styles.chipText, on && { color: '#fff' }]}>{o.label}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
   );
 }
 
@@ -146,21 +158,22 @@ const styles = StyleSheet.create({
   input: {
     ...t.body,
     color: colors.ink,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     paddingHorizontal: space.md,
     paddingVertical: 12,
   },
-  hint: { ...t.body, fontSize: 12, color: colors.muted, lineHeight: 17 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+  picker: {
     backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: 14,
   },
-  chipOn: { backgroundColor: colors.ink },
-  chipText: { ...t.body, fontSize: 13, color: colors.ink, fontWeight: '600' },
-  error: { ...t.body, fontSize: 13, color: colors.danger },
+  pickerText: { ...t.body, fontWeight: '600', color: colors.ink },
+  hint: { ...t.small, fontSize: 12, color: colors.faint, lineHeight: 17 },
+  error: { ...t.small, color: colors.danger },
 });

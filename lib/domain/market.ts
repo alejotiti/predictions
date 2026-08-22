@@ -82,10 +82,19 @@ export function distributePool(
   const winningTotal = winners.reduce((acc, w) => acc + w.stake, 0);
   if (winners.length === 0 || winningTotal <= 0 || pool <= 0) return result;
 
+  // Todo en enteros a propósito. Calcular el residuo como `exact - base` en
+  // punto flotante rompe el desempate: dos ganadores con el mismo residuo
+  // exacto dan residuos distintos según la magnitud de su parte entera, y el
+  // orden termina dependiendo del error de redondeo. Con el numerador sin
+  // dividir y un módulo, el residuo es exacto y coincide con el de la RPC.
   const rows = winners.map((w) => {
-    const exact = (w.stake * pool) / winningTotal;
-    const base = Math.floor(exact);
-    return { userId: w.userId, stake: w.stake, base, remainder: exact - base };
+    const numerator = w.stake * pool;
+    return {
+      userId: w.userId,
+      stake: w.stake,
+      base: Math.floor(numerator / winningTotal),
+      remainder: numerator % winningTotal,
+    };
   });
 
   let leftover = pool - rows.reduce((acc, r) => acc + r.base, 0);

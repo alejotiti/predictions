@@ -1,6 +1,11 @@
 import { View, Text, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, radius, space, type as t } from '../theme';
+import { colors, control, radius, shadow, space, type as t } from '../theme';
 
+/**
+ * La tarjeta se separa del papel con sombra y no con borde (DESIGN.md): sobre
+ * un fondo gris, un contorno gris no separa nada y le compite a la barra del
+ * pozo, que es lo único que tiene que llamar la atención adentro.
+ */
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
@@ -9,18 +14,26 @@ export function Label({ children }: { children: React.ReactNode }) {
   return <Text style={styles.label}>{children}</Text>;
 }
 
+/** El punto verde de "esto está abierto". No es un lado ni un semáforo. */
+export function LiveDot({ color = colors.live, size = 7 }: { color?: string; size?: number }) {
+  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
+}
+
 export function Button({
   title,
   onPress,
   tone = 'ink',
   disabled,
   style,
+  icon,
 }: {
   title: string;
   onPress: () => void;
   tone?: 'ink' | 'yes' | 'no' | 'ghost';
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Recibe el color del texto para que el ícono siga el tono del botón. */
+  icon?: (color: string) => React.ReactNode;
 }) {
   const bg =
     tone === 'yes' ? colors.yes : tone === 'no' ? colors.no : tone === 'ghost' ? 'transparent' : colors.ink;
@@ -28,16 +41,23 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        // Deshabilitado es opacidad, no otro color: el botón se destiñe y se
+        // lee "existe pero no ahora", que es justo lo que pasa con el lado
+        // bloqueado cuando ya apostaste del otro.
         { backgroundColor: bg, opacity: disabled ? 0.35 : pressed ? 0.85 : 1 },
         tone === 'ghost' && styles.buttonGhost,
         style,
       ]}
     >
-      <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+      <View style={styles.buttonContent}>
+        {icon?.(fg)}
+        <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -47,7 +67,7 @@ export function Pill({ text, tone = 'neutral' }: { text: string; tone?: 'neutral
     neutral: { bg: colors.surfaceAlt, fg: colors.muted },
     yes: { bg: colors.yesSoft, fg: colors.yes },
     no: { bg: colors.noSoft, fg: colors.no },
-    warn: { bg: '#FFF3D6', fg: '#8A6100' },
+    warn: { bg: colors.warnSoft, fg: colors.warn },
   }[tone];
   return (
     <View style={[styles.pill, { backgroundColor: map.bg }]}>
@@ -68,23 +88,24 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: space.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
+    ...shadow.card,
   },
-  label: { ...t.label, color: colors.muted, textTransform: 'uppercase' },
+  label: { ...t.label, color: colors.faint },
   button: {
-    paddingVertical: 14,
+    minHeight: control.height,
     paddingHorizontal: space.lg,
     borderRadius: radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonGhost: { borderWidth: 1, borderColor: colors.line },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   buttonText: { fontSize: 15, fontWeight: '700' },
-  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, alignSelf: 'flex-start' },
+  pill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, alignSelf: 'flex-start' },
   pillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   empty: { padding: space.xl, alignItems: 'center', gap: 6 },
   emptyTitle: { ...t.body, fontWeight: '600', color: colors.ink },
-  emptyHint: { ...t.body, fontSize: 13, color: colors.muted, textAlign: 'center' },
+  emptyHint: { ...t.small, color: colors.muted, textAlign: 'center' },
 });

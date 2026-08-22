@@ -1,64 +1,67 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, space, type as t } from '../theme';
-import { Card, Pill } from './ui';
+import { Card } from './ui';
 import { PoolBar } from './PoolBar';
-import { useStore } from '../lib/mock/store';
-import { effectiveStatus, statusLabel } from '../lib/domain/poll';
-import { totalPool } from '../lib/domain/market';
-import { points, timeLeft } from '../lib/format';
-import { displayName, type Poll } from '../lib/mock/data';
+import { CloseDate, MyPosition, StatusRow } from './PollParts';
+import { poolOf, myBetIn } from '../lib/predictions';
+import { nameOf, type NameMap } from '../lib/profiles';
+import { effectiveStatus } from '../lib/domain/poll';
+import { estimatedMultiplier, totalPool } from '../lib/domain/market';
+import { timeLeft } from '../lib/format';
+import type { PollWithBets } from '../lib/db/types';
 
-export function PollCard({ poll }: { poll: Poll }) {
+/**
+ * La tarjeta del feed es el detalle recortado, con la misma anatomía y en el
+ * escalón de abajo de la tipografía (DESIGN.md): título, fecha, estado y pozo,
+ * barra, tu posición.
+ *
+ * El pozo y la apuesta propia salen de las apuestas que ya vinieron embebidas
+ * con la poll: la tarjeta no hace ningún viaje extra a la red.
+ */
+export function PollCard({
+  poll,
+  names,
+  userId,
+}: {
+  poll: PollWithBets;
+  names: NameMap;
+  userId: string | null;
+}) {
   const router = useRouter();
-  const { poolOf, myBet } = useStore();
-  const pool = poolOf(poll.id);
-  const mine = myBet(poll.id);
-  const status = effectiveStatus(poll.status, poll.bettingClosesAt);
-  const left = timeLeft(poll.bettingClosesAt);
+  const pool = poolOf(poll.bets);
+  const mine = myBetIn(poll.bets, userId);
+  const status = effectiveStatus(poll.status, poll.betting_closes_at);
+  const left = timeLeft(poll.betting_closes_at);
 
   return (
     <Pressable onPress={() => router.push(`/poll/${poll.id}`)}>
       <Card style={{ gap: space.md }}>
-        <View style={styles.top}>
+        <View style={{ gap: 2 }}>
           <Text style={styles.title}>{poll.title}</Text>
+          <CloseDate iso={poll.betting_closes_at} />
         </View>
 
-        <PoolBar pool={pool} myside={mine?.side} compact />
+        <StatusRow status={status} left={left} pool={totalPool(pool)} compact />
 
-        <View style={styles.meta}>
-          <Text style={styles.pot}>{points(totalPool(pool))} pts en juego</Text>
-          {status === 'OPEN' && left ? (
-            <Text style={styles.time}>cierra en {left}</Text>
-          ) : (
-            <Pill
-              text={statusLabel[status]}
-              tone={status === 'RESOLVED_YES' ? 'yes' : status === 'RESOLVED_NO' ? 'no' : 'neutral'}
-            />
-          )}
-        </View>
+        <PoolBar pool={pool} compact />
 
         {mine && (
-          <Text style={styles.mine}>
-            Tu apuesta: {points(mine.amount)} a{' '}
-            <Text style={{ color: mine.side === 'YES' ? colors.yes : colors.no, fontWeight: '700' }}>
-              {mine.side === 'YES' ? 'SÍ' : 'NO'}
-            </Text>
-          </Text>
+          <MyPosition
+            side={mine.side}
+            amount={mine.amount}
+            multiplier={estimatedMultiplier(pool, mine.side, 0, mine.amount)}
+            compact
+          />
         )}
 
-        <Text style={styles.by}>por {displayName(poll.creatorId)}</Text>
+        <Text style={styles.by}>por {nameOf(names, poll.creator_id)}</Text>
       </Card>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'space-between', gap: space.sm },
-  title: { ...t.title, color: colors.ink, flex: 1, lineHeight: 26 },
-  meta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pot: { ...t.points, color: colors.ink },
-  time: { ...t.body, fontSize: 13, color: colors.muted },
-  mine: { ...t.body, fontSize: 13, color: colors.muted },
-  by: { ...t.body, fontSize: 12, color: colors.muted },
+  title: { ...t.title, color: colors.ink },
+  by: { ...t.small, fontSize: 12, color: colors.muted },
 });

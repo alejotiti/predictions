@@ -1,38 +1,74 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { colors, space, type as t } from '../../../theme';
+import { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { colors, radius, space, type as t } from '../../../theme';
 import { Button, Card, Empty, Label, Pill } from '../../../components/ui';
-import { useStore } from '../../../lib/mock/store';
-import { displayName } from '../../../lib/mock/data';
+import { AdminCardSkeleton } from '../../../components/Skeleton';
+import { useGroupFeed, poolOf, reviewPoll, resolvePoll } from '../../../lib/predictions';
+import { useGroupId } from '../../../lib/groups';
+import { nameOf } from '../../../lib/profiles';
 import { points, shortDate } from '../../../lib/format';
-import { totalPool } from '../../../lib/domain/market';
+import { totalPool, type Side } from '../../../lib/domain/market';
 
 export default function AdminPanel() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
-  const { pollsOf, dispatch, isAdmin, poolOf, betsOf } = useStore();
+  const groupId = useGroupId();
+  const { polls, names, isAdmin, status, error, refreshing, refresh, pullToRefresh } =
+    useGroupFeed(groupId);
+  // Qué poll está esperando respuesta del servidor, para no dejar apretar dos veces.
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  if (!isAdmin(groupId)) {
+  // La pantalla se esconde por prolijidad; el que de verdad corta el paso es el
+  // `is_group_admin` de las RPC (§15).
+  if (status === 'ready' && !isAdmin) {
     return <Empty title="Esta pantalla es solo para el árbitro del grupo." />;
   }
 
-  const polls = pollsOf(groupId);
+  const loading = status === 'loading';
   const toApprove = polls.filter((p) => p.status === 'PENDING_APPROVAL');
   const toResolve = polls.filter((p) => p.status === 'PENDING_RESULT');
 
+  async function run(pollId: string, action: () => Promise<void>) {
+    setBusy(pollId);
+    setActionError(null);
+    try {
+      await action();
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'No pudimos completar la acción.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView
+      contentContainerStyle={styles.page}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={colors.muted} />
+      }
+    >
+      {(status === 'error' || actionError) && (
+        <Card style={{ gap: space.md }}>
+          <Text style={styles.errorText}>{actionError ?? error}</Text>
+          <Button title="Reintentar" tone="ghost" onPress={refresh} />
+        </Card>
+      )}
+
       <Label>Para aprobar</Label>
-      {toApprove.length === 0 && <Text style={styles.none}>Nada pendiente.</Text>}
+      {/* "Nada pendiente" recién con la consulta terminada: si no, el árbitro
+          lee que no tiene trabajo justo mientras se está cargando el que tiene. */}
+      {loading && <AdminCardSkeleton />}
+      {!loading && toApprove.length === 0 && <Text style={styles.none}>Nada pendiente.</Text>}
       {toApprove.map((p) => (
         <Card key={p.id} style={{ gap: space.md }}>
           <Text style={styles.title}>{p.title}</Text>
           {p.description && <Text style={styles.desc}>{p.description}</Text>}
           <Text style={styles.meta}>
-            de {displayName(p.creatorId)} · cierra {shortDate(p.bettingClosesAt)}
+            de {nameOf(names, p.creator_id)} · cierra {shortDate(p.betting_closes_at)}
           </Text>
-          {p.subjectIds.length > 0 && (
+          {p.subject_ids.length > 0 && (
             <Text style={styles.meta}>
-              Involucra a {p.subjectIds.map(displayName).join(', ')}
+              Involucra a {p.subject_ids.map((id) => nameOf(names, id)).join(', ')}
             </Text>
           )}
           <Text style={styles.criterion}>
@@ -43,53 +79,57 @@ export default function AdminPanel() {
             <Button
               title="Aprobar"
               style={{ flex: 1 }}
-              onPress={() => dispatch({ type: 'REVIEW_POLL', pollId: p.id, approve: true })}
+              disabled={busy === p.id}
+              onPress={() => run(p.id, () => reviewPoll(p.id, true))}
             />
             <Button
               title="Rechazar"
               tone="ghost"
               style={{ flex: 1 }}
-              onPress={() => dispatch({ type: 'REVIEW_POLL', pollId: p.id, approve: false })}
+              disabled={busy === p.id}
+              onPress={() => run(p.id, () => reviewPoll(p.id, false))}
             />
           </View>
         </Card>
       ))}
 
       <Label>Para resolver</Label>
-      {toResolve.length === 0 && <Text style={styles.none}>Nada pendiente.</Text>}
+      {loading && <AdminCardSkeleton />}
+      {!loading && toResolve.length === 0 && <Text style={styles.none}>Nada pendiente.</Text>}
       {toResolve.map((p) => {
-        const pool = poolOf(p.id);
-        const n = betsOf(p.id).length;
+        const pool = poolOf(p.bets);
+        const n = p.bets.length;
         return (
           <Card key={p.id} style={{ gap: space.md }}>
             <Text style={styles.title}>{p.title}</Text>
             <Text style={styles.meta}>
               {points(totalPool(pool))} pts de {n} {n === 1 ? 'apuesta' : 'apuestas'}
             </Text>
-            {p.proposedOutcome && (
+            {p.proposed_outcome && (
               <Pill
-                text={`${displayName(p.proposedBy!)} propone ${p.proposedOutcome === 'YES' ? 'SÍ' : 'NO'}`}
-                tone={p.proposedOutcome === 'YES' ? 'yes' : 'no'}
+                text={`${p.proposed_by ? nameOf(names, p.proposed_by) : 'Alguien'} propone ${
+                  p.proposed_outcome === 'YES' ? 'SÍ' : 'NO'
+                }`}
+                tone={p.proposed_outcome === 'YES' ? 'yes' : 'no'}
               />
             )}
             <View style={styles.actions}>
-              <Button
-                title="SÍ"
-                tone="yes"
-                style={{ flex: 1 }}
-                onPress={() => dispatch({ type: 'RESOLVE_POLL', pollId: p.id, outcome: 'YES' })}
-              />
-              <Button
-                title="NO"
-                tone="no"
-                style={{ flex: 1 }}
-                onPress={() => dispatch({ type: 'RESOLVE_POLL', pollId: p.id, outcome: 'NO' })}
-              />
+              {(['YES', 'NO'] as Side[]).map((side) => (
+                <Button
+                  key={side}
+                  title={side === 'YES' ? 'SÍ' : 'NO'}
+                  tone={side === 'YES' ? 'yes' : 'no'}
+                  style={{ flex: 1 }}
+                  disabled={busy === p.id}
+                  onPress={() => run(p.id, () => resolvePoll(p.id, side))}
+                />
+              ))}
             </View>
             <Button
               title="Anular y devolver todo"
               tone="ghost"
-              onPress={() => dispatch({ type: 'RESOLVE_POLL', pollId: p.id, outcome: 'VOID' })}
+              disabled={busy === p.id}
+              onPress={() => run(p.id, () => resolvePoll(p.id, 'VOID'))}
             />
           </Card>
         );
@@ -100,18 +140,19 @@ export default function AdminPanel() {
 
 const styles = StyleSheet.create({
   page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
-  title: { ...t.title, fontSize: 17, color: colors.ink },
-  desc: { ...t.body, fontSize: 13, color: colors.muted, lineHeight: 19 },
-  meta: { ...t.body, fontSize: 12, color: colors.muted },
+  title: { ...t.title, color: colors.ink },
+  desc: { ...t.small, color: colors.muted },
+  meta: { ...t.small, fontSize: 12, color: colors.faint },
   criterion: {
-    ...t.body,
+    ...t.small,
     fontSize: 12,
-    color: '#8A6100',
-    backgroundColor: '#FFF3D6',
+    color: colors.warn,
+    backgroundColor: colors.warnSoft,
     padding: space.md,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     lineHeight: 17,
   },
   actions: { flexDirection: 'row', gap: space.sm },
-  none: { ...t.body, fontSize: 13, color: colors.muted },
+  none: { ...t.small, color: colors.faint },
+  errorText: { ...t.body, color: colors.danger },
 });
