@@ -142,17 +142,24 @@ function useLoadable<T>(
 // Feed del grupo: las predicciones, tu saldo y tu rol.
 // ---------------------------------------------------------------------------
 
+/**
+ * Cuántos mensajes sin leer tiene cada predicción, para vos. Sólo trae las que
+ * tienen alguno: si el id no está en el mapa, no hay nada que avisar.
+ */
+export type UnreadMap = Record<string, number>;
+
 export type FeedData = {
   polls: PollWithBets[];
   balance: number;
   role: Role | null;
   names: NameMap;
+  unread: UnreadMap;
 };
 
-const EMPTY_FEED: FeedData = { polls: [], balance: 0, role: null, names: {} };
+const EMPTY_FEED: FeedData = { polls: [], balance: 0, role: null, names: {}, unread: {} };
 
 async function fetchFeed(groupId: string, userId: string): Promise<FeedData> {
-  const [pollsRes, balanceRes, memberRes] = await Promise.all([
+  const [pollsRes, balanceRes, memberRes, unreadRes] = await Promise.all([
     supabase
       .from('polls')
       .select(`${POLL_COLUMNS}, ${BET_COLUMNS}`)
@@ -165,6 +172,7 @@ async function fetchFeed(groupId: string, userId: string): Promise<FeedData> {
       .eq('group_id', groupId)
       .eq('user_id', userId)
       .maybeSingle(),
+    supabase.rpc('group_unread', { p_group_id: groupId }),
   ]);
   if (pollsRes.error) throw pollsRes.error;
   if (balanceRes.error) throw balanceRes.error;
@@ -181,7 +189,25 @@ async function fetchFeed(groupId: string, userId: string): Promise<FeedData> {
     // es la RPC, no esta pantalla.
     role: ((memberRes.data as { role?: Role } | null)?.role as Role) ?? null,
     names: await fetchNames(polls.map((p) => p.creator_id)),
+    unread: unreadMap(unreadRes),
   };
+}
+
+/**
+ * El puntito de mensajes sin leer es lo único de esta pantalla que puede faltar
+ * sin que se rompa nada, así que su error no tira abajo el feed entero: sin la
+ * RPC —o sin `poll-reads.sql` corrido— las predicciones se ven igual, sólo que
+ * sin avisos.
+ */
+function unreadMap(res: { data: unknown; error: unknown }): UnreadMap {
+  if (res.error || !Array.isArray(res.data)) {
+    // Callado en producción, pero no en desarrollo: si `group_unread` falla,
+    // el síntoma es que no pasa nada, y eso es lo peor para depurar.
+    if (__DEV__ && res.error) console.warn('group_unread falló:', res.error);
+    return {};
+  }
+  const rows = res.data as { poll_id: string; unread: number }[];
+  return Object.fromEntries(rows.map((r) => [r.poll_id, r.unread]));
 }
 
 export function useGroupFeed(groupId: string | undefined) {
@@ -374,6 +400,16 @@ export async function resolvePoll(pollId: string, outcome: Side | 'VOID'): Promi
     p_outcome: outcome,
   });
   if (error) throw new Error(dbErrorMessage(error, 'No pudimos resolver la predicción.'));
+}
+
+/**
+ * Marca los comentarios de la predicción como vistos por vos, y sólo por vos.
+ * Es la única mutación que no le avisa a la pantalla si falla: lo peor que pasa
+ * es que el puntito siga prendido hasta la próxima vez que entres, y un cartel
+ * de error por eso molestaría más que el punto.
+ */
+export async function markPollRead(pollId: string): Promise<void> {
+  await supabase.rpc('mark_poll_read', { p_poll_id: pollId });
 }
 
 export async function sendPollMessage(pollId: string, body: string): Promise<void> {

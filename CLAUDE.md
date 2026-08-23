@@ -7,7 +7,7 @@ polls, apuestas, ledger y chat en `lib/predictions.tsx`. `lib/mock/` quedó sin 
 
 El SQL se corre a mano en el SQL Editor, en este orden: `supabase/fix-rls-recursion.sql`,
 `supabase/add-points-to-group-members.sql`, `supabase/ledger.sql`,
-`supabase/leave-group.sql`. Los cuatro son idempotentes.
+`supabase/leave-group.sql`, `supabase/poll-reads.sql`. Los cinco son idempotentes.
 
 Necesita un `.env` con `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 (ver `.env.example`). Después de tocarlo, `npx expo start -c`.
@@ -28,9 +28,10 @@ radios ni tamaños sueltos.
   aritmética entera: con residuos en punto flotante el desempate se rompe.
 - Toda escritura pasa por RPC, nunca por un insert desde el cliente: crear grupo
   y unirse (`create_group` / `join_group_by_code`), y adentro del grupo
-  `create_poll`, `review_poll`, `place_bet`, `propose_outcome`, `resolve_poll` y
-  `send_poll_message`. Salir de un grupo también: `leave_group`. Las tablas
-  sólo tienen policies de SELECT.
+  `create_poll`, `review_poll`, `place_bet`, `propose_outcome`, `resolve_poll`,
+  `send_poll_message` y `mark_poll_read`. Salir de un grupo también:
+  `leave_group`. Las tablas sólo tienen policies de SELECT, y `poll_reads` ni
+  eso: no se toca nunca desde el cliente, se lee contada por `group_unread`.
 - Un grupo con gente adentro nunca se queda sin árbitro: si el último
   owner/admin se va, `leave_group` le pasa el rol al integrante más antiguo.
   El grupo que queda en cero miembros se borra, y ahí su `invite_code` vuelve

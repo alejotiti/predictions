@@ -49,6 +49,9 @@ lee. Un nombre se lee: la autoría de una predicción ("por Fulano") va en
 - El verde no es un lado. Se usa en dos lugares y solo en dos: el punto de
   `live` cuando una predicción está abierta, y el multiplicador (`gain`).
 - El amarillo (`warn` / `warnSoft`) es del árbitro: lo que espera una decisión.
+- El punto de comentarios sin leer va en `colors.accent`. Es azul, pero no el
+  azul del SÍ: un punto suelto en una esquina, sin rótulo que lo explique, no
+  puede leerse como un lado.
 - El rojo (`danger`) es solo para errores y para salir de un grupo.
 
 ## Controles
@@ -67,7 +70,13 @@ lee. Un nombre se lee: la autoría de una predicción ("por Fulano") va en
 Es la misma en el feed y en el detalle, y ese es el punto: la tarjeta del feed
 es el detalle recortado, no otra cosa.
 
-1. **Título** — `h1` en el detalle, `title` en la tarjeta del feed.
+1. **Título** — `h1` en el detalle, `title` en la tarjeta del feed. En el feed
+   comparte renglón con el punto de comentarios sin leer (`UnreadDot`), que va
+   a la derecha del todo y sólo aparece si hay algo que no viste. Va en la fila
+   del título y no absoluto sobre la esquina: así un título largo lo empuja en
+   vez de pasarle por debajo. Es punto pelado, sin número: lo único que hay que
+   decidir mirándolo es si entrar. Se apaga al abrir la predicción, y sólo para
+   el que la abrió.
 2. **Fecha de cierre** — `small` en `colors.accent`, pegada abajo del título.
 3. **Fila de estado** — a la izquierda el punto verde + cuánto falta; a la
    derecha el pozo en `numBig` (detalle) o `num` (feed). Si ya no está abierta,

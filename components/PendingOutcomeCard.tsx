@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, space, type as t } from '../theme';
-import { Button, Card } from './ui';
+import { Button, Card, UnreadDot } from './ui';
 import { proposeOutcome } from '../lib/predictions';
 import { shortDate } from '../lib/format';
 import type { Poll } from '../lib/db/types';
@@ -26,10 +26,17 @@ import type { Side } from '../lib/domain/market';
 export function PendingOutcomeCard({
   poll,
   onProposed,
+  unread = 0,
 }: {
   poll: Poll;
   /** Para que el feed se recargue y la tarjeta se vaya sola. */
   onProposed: () => Promise<void>;
+  /**
+   * El mismo punto que en `PollCard`, y por la misma razón: es la misma
+   * predicción con otra cara. Si sólo lo tuviera la otra tarjeta, cerrar las
+   * apuestas apagaría el aviso de un comentario sin leer.
+   */
+  unread?: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -57,7 +64,10 @@ export function PendingOutcomeCard({
         onPress={() => router.push(`/poll/${poll.id}`)}
         style={({ pressed }) => [styles.head, { opacity: pressed ? 0.6 : 1 }]}
       >
-        <Text style={styles.title}>{poll.title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { flex: 1 }]}>{poll.title}</Text>
+          <UnreadDot count={unread} />
+        </View>
         <Text style={styles.meta}>cerró {shortDate(poll.betting_closes_at)}</Text>
       </Pressable>
 
@@ -87,6 +97,7 @@ export function PendingOutcomeCard({
 
 const styles = StyleSheet.create({
   head: { gap: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   title: { ...t.title, color: colors.ink },
   meta: { ...t.small, fontSize: 12, color: colors.faint },
   ask: { ...t.small, color: colors.muted },

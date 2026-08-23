@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { CloseDate, MyPosition, StatusRow } from '../../components/PollParts';
 import { BetSheet } from '../../components/BetSheet';
 import { ChatMessages, ChatComposer } from '../../components/Chat';
 import { PollDetailSkeleton } from '../../components/Skeleton';
-import { usePoll, poolOf, placeBet, proposeOutcome } from '../../lib/predictions';
+import { usePoll, poolOf, placeBet, proposeOutcome, markPollRead } from '../../lib/predictions';
 import { nameOf } from '../../lib/profiles';
 import { effectiveStatus } from '../../lib/domain/poll';
 import { estimatedMultiplier, totalPool, type Side } from '../../lib/domain/market';
@@ -43,6 +43,17 @@ export default function PollDetail() {
   const openSide = sheetSide ?? lastSide.current;
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Estar en esta pantalla es haber visto los comentarios: se apaga el punto de
+  // la tarjeta del feed, y sólo para vos. Se vuelve a marcar cuando cambia la
+  // cantidad de mensajes —al mandar uno, o al recargar por foco con algo
+  // nuevo—, porque en ese momento ya los estás mirando. El hook va acá arriba,
+  // antes de los returns de carga y error, que es donde tienen que estar todos.
+  const messageCount = messages.length;
+  useEffect(() => {
+    if (!pollId || loadStatus !== 'ready') return;
+    void markPollRead(pollId);
+  }, [pollId, messageCount, loadStatus]);
 
   // Header propio en vez del nativo: es lo que hace que la burbuja del saldo se
   // vea igual acá que en "Inicio". El porqué está en components/ScreenHeader.

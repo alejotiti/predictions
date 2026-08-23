@@ -15,8 +15,19 @@ export default function Feed() {
   const groupId = useGroupId();
   const router = useRouter();
   const navigation = useNavigation();
-  const { polls, balance, isAdmin, userId, names, status, error, refreshing, refresh, pullToRefresh } =
-    useGroupFeed(groupId);
+  const {
+    polls,
+    balance,
+    isAdmin,
+    userId,
+    names,
+    unread,
+    status,
+    error,
+    refreshing,
+    refresh,
+    pullToRefresh,
+  } = useGroupFeed(groupId);
 
   // Un solo reloj para todo el render: si cada llamada tomara la hora por su
   // cuenta, una poll que vence justo ahora podría filtrarse con un estado y
@@ -87,7 +98,7 @@ export default function Feed() {
         <>
           <Label>{toAnswer.length === 1 ? 'Espera tu resultado' : 'Esperan tu resultado'}</Label>
           {toAnswer.map((p) => (
-            <PendingOutcomeCard key={p.id} poll={p} onProposed={refresh} />
+            <PendingOutcomeCard key={p.id} poll={p} onProposed={refresh} unread={unread[p.id] ?? 0} />
           ))}
         </>
       )}
@@ -107,7 +118,7 @@ export default function Feed() {
         <Empty title="No hay predicciones abiertas" hint="Creá la primera desde la pestaña Crear." />
       )}
       {live.map((p) => (
-        <PollCard key={p.id} poll={p} names={names} userId={userId} />
+        <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
       ))}
 
       {done.length > 0 && (
@@ -116,7 +127,7 @@ export default function Feed() {
             <Label>Historial</Label>
           </View>
           {done.map((p) => (
-            <PollCard key={p.id} poll={p} names={names} userId={userId} />
+            <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
           ))}
         </>
       )}

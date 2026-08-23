@@ -19,6 +19,30 @@ export function LiveDot({ color = colors.live, size = 7 }: { color?: string; siz
   return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
 }
 
+/**
+ * Comentarios que todavía no viste, arriba a la derecha de la tarjeta.
+ *
+ * Va en `colors.accent` y no en `colors.yes`: azul, pero no el azul del SÍ, así
+ * que un punto suelto en una esquina no se lee como un lado (DESIGN.md). Es un
+ * poco más grande que el punto de `live` para que no parezca el mismo dato
+ * mirado de reojo.
+ *
+ * Punto pelado, sin el número adentro: lo único que hay que decidir mirándolo
+ * es si entrar o no, y para eso alcanza con que haya algo. La cuenta va en la
+ * etiqueta de accesibilidad, donde sí suma.
+ */
+export function UnreadDot({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <View
+      accessibilityLabel={
+        count === 1 ? '1 comentario sin leer' : `${count} comentarios sin leer`
+      }
+      style={styles.unreadDot}
+    />
+  );
+}
+
 export function Button({
   title,
   onPress,
@@ -93,6 +117,16 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   label: { ...t.label, color: colors.faint },
+  // El `marginTop` lo centra contra el primer renglón del título (9 de punto
+  // dentro de los 24 de `lineHeight`), que es donde tiene que quedar cuando el
+  // título ocupa dos líneas.
+  unreadDot: {
+    width: 9,
+    height: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    marginTop: (t.title.lineHeight - 9) / 2,
+  },
   button: {
     minHeight: control.height,
     paddingHorizontal: space.lg,

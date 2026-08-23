@@ -26,6 +26,14 @@ import { useAuth } from '../../lib/auth';
 
 const USERNAME_MAX = 20;
 
+/**
+ * El usuario admite letras sin tildes, números, guiones y guiones bajos:
+ * filtramos al tipear (y al pegar) en vez de retar después.
+ */
+function cleanUsername(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 export default function Register() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,15 +110,16 @@ export default function Register() {
                 <TextInput
                   value={username}
                   onChangeText={(v) => {
-                    setUsername(v);
+                    setUsername(cleanUsername(v));
                     setError(null);
                   }}
                   autoFocus
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="off"
                   maxLength={USERNAME_MAX}
                   returnKeyType="next"
-                  placeholder="Ej: facu"
+                  placeholder="No uses tu nombre real"
                   placeholderTextColor={colors.faint}
                   style={styles.inputText}
                 />

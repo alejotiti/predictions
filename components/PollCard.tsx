@@ -1,7 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, space, type as t } from '../theme';
-import { Card } from './ui';
+import { Card, UnreadDot } from './ui';
 import { PoolBar } from './PoolBar';
 import { CloseDate, MyPosition, StatusRow } from './PollParts';
 import { poolOf, myBetIn } from '../lib/predictions';
@@ -23,10 +23,13 @@ export function PollCard({
   poll,
   names,
   userId,
+  unread = 0,
 }: {
   poll: PollWithBets;
   names: NameMap;
   userId: string | null;
+  /** Comentarios que no viste. Sale del feed, que lo pide contado a la base. */
+  unread?: number;
 }) {
   const router = useRouter();
   const pool = poolOf(poll.bets);
@@ -38,7 +41,13 @@ export function PollCard({
     <Pressable onPress={() => router.push(`/poll/${poll.id}`)}>
       <Card style={{ gap: space.md }}>
         <View style={{ gap: 2 }}>
-          <Text style={styles.title}>{poll.title}</Text>
+          {/* El punto va en la fila del título y no absoluto sobre la esquina:
+              así un título de dos líneas lo empuja en vez de pasarle por
+              debajo. */}
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { flex: 1 }]}>{poll.title}</Text>
+            <UnreadDot count={unread} />
+          </View>
           <CloseDate iso={poll.betting_closes_at} />
         </View>
 
@@ -62,6 +71,7 @@ export function PollCard({
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   title: { ...t.title, color: colors.ink },
   by: { ...t.small, fontSize: 12, color: colors.muted },
 });
