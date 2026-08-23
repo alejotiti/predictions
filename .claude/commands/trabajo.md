@@ -43,11 +43,12 @@ Corré lo que corresponda y **no sigas si algo falla**:
 
 ```bash
 cd ~/predictions
-npx tsc --noEmit 2>&1 | grep -v '^_src_template/' | grep -E 'error TS'
+npx tsc --noEmit
 ```
 
-Los errores de `_src_template/` son preexistentes (plantilla vieja de Expo) y se
-ignoran a propósito. Cualquier error **fuera** de esa carpeta sí es tuyo: arreglalo.
+Tiene que salir sin una sola línea de error. El `tsconfig.json` ya excluye
+`_src_template/` (plantilla vieja de Expo que no importa nadie), así que cualquier
+cosa que aparezca acá es tuya y hay que arreglarla — no la filtres ni la ignores.
 
 Si tocaste `lib/domain/market.ts`, además:
 
