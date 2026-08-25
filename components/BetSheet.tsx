@@ -219,7 +219,14 @@ export function BetSheet({
                     key={q}
                     onPress={() => setRaw(String(q))}
                     disabled={q > balance}
-                    style={[styles.chip, q > balance && { opacity: 0.3 }]}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      q > balance && { opacity: 0.3 },
+                      // El chip es chico y no lleva transform: a este tamaño un
+                      // 0,97 no se ve. Lo que responde es el fondo, que se
+                      // oscurece un punto mientras el dedo está apoyado.
+                      pressed && q <= balance && styles.chipPressed,
+                    ]}
                   >
                     <Text style={styles.chipText}>{q}</Text>
                   </Pressable>
@@ -227,7 +234,11 @@ export function BetSheet({
                 <Pressable
                   onPress={() => setRaw(String(balance))}
                   disabled={balance <= 0}
-                  style={[styles.chip, balance <= 0 && { opacity: 0.3 }]}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    balance <= 0 && { opacity: 0.3 },
+                    pressed && balance > 0 && styles.chipPressed,
+                  ]}
                 >
                   <Text style={styles.chipText}>todo</Text>
                 </Pressable>
@@ -335,6 +346,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
   },
+  chipPressed: { backgroundColor: colors.line },
   chipText: { ...t.num, fontSize: 13, color: colors.ink },
   rows: { gap: 6, paddingVertical: space.sm },
   row: {

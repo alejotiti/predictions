@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, { Easing, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { colors, space, type as t } from '../theme';
+import { colors, motion, space, type as t } from '../theme';
+
+const easeOut = Easing.bezier(...motion.bezier.out);
 import { Button, Card, UnreadDot } from './ui';
 import { proposeOutcome } from '../lib/predictions';
 import { shortDate } from '../lib/format';
@@ -57,6 +60,14 @@ export function PendingOutcomeCard({
   }
 
   return (
+    // Entra antes que el feed y sin esperar turno: es lo único de la pantalla
+    // donde el que tiene que hacer algo sos vos. Y se va fundiéndose cuando
+    // contestás, que es la confirmación de que quedó contestada —el feed de
+    // abajo sube solo a ocupar el lugar.
+    <Animated.View
+      entering={FadeInDown.duration(motion.duration.enter).easing(easeOut)}
+      exiting={FadeOut.duration(motion.duration.enter).easing(easeOut)}
+    >
     <Card style={{ gap: space.md }}>
       <Pressable
         accessibilityRole="button"
@@ -92,6 +103,7 @@ export function PendingOutcomeCard({
         />
       </View>
     </Card>
+    </Animated.View>
   );
 }
 

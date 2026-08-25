@@ -1,5 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, radius, space, type as t } from '../theme';
+import Animated, { Easing, FadeIn } from 'react-native-reanimated';
+import { colors, motion, radius, space, type as t } from '../theme';
+
+const easeOut = Easing.bezier(...motion.bezier.out);
 import { LiveDot, Pill } from './ui';
 import { statusLabel, type PollStatus } from '../lib/domain/poll';
 import type { Side } from '../lib/domain/market';
@@ -82,17 +85,26 @@ export function MyPosition({
   // puntos medios y con el lado y el multiplicador en su color.
   if (compact) {
     return (
-      <Text style={styles.positionText}>
+      <Animated.Text
+        entering={FadeIn.duration(motion.duration.enter).easing(easeOut)}
+        style={styles.positionText}
+      >
         {points(amount)} pts <Text style={styles.sep}>·</Text>{' '}
         <Text style={{ fontWeight: '700', color: sideColor }}>{sideText}</Text>{' '}
         <Text style={styles.sep}>·</Text> <Text style={styles.mult}>{multiplier.toFixed(2)}×</Text>
-      </Text>
+      </Animated.Text>
     );
   }
 
   // En el detalle es un bloque propio, con los rótulos escritos y su caja gris.
+  // Aparece fundiéndose porque aparece de verdad: antes de apostar este bloque
+  // no existe, y la tarjeta que lo contiene crece para hacerle lugar. Sin el
+  // fundido, confirmar una apuesta empuja media pantalla de un salto.
   return (
-    <View style={styles.position}>
+    <Animated.View
+      entering={FadeIn.duration(motion.duration.enter).easing(easeOut)}
+      style={styles.position}
+    >
       <Text style={styles.positionText}>
         Tu apuesta: {points(amount)} a <Text style={{ fontWeight: '700', color: sideColor }}>
           {sideText}
@@ -101,7 +113,7 @@ export function MyPosition({
       <Text style={styles.positionText}>
         Multiplicador actual: <Text style={styles.mult}>{multiplier.toFixed(2)}×</Text>
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -117,8 +117,15 @@ export default function Feed() {
       {status === 'ready' && live.length === 0 && toAnswer.length === 0 && (
         <Empty title="No hay predicciones abiertas" hint="Creá la primera desde la pestaña Crear." />
       )}
-      {live.map((p) => (
-        <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
+      {live.map((p, i) => (
+        <PollCard
+          key={p.id}
+          poll={p}
+          names={names}
+          userId={userId}
+          unread={unread[p.id] ?? 0}
+          index={i}
+        />
       ))}
 
       {done.length > 0 && (
@@ -126,8 +133,17 @@ export default function Feed() {
           <View style={styles.section}>
             <Label>Historial</Label>
           </View>
-          {done.map((p) => (
-            <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
+          {done.map((p, i) => (
+            <PollCard
+              key={p.id}
+              poll={p}
+              names={names}
+              userId={userId}
+              unread={unread[p.id] ?? 0}
+              // El historial sigue escalonando desde donde terminó el feed vivo,
+              // así la lista entera se lee como una sola caída y no como dos.
+              index={live.length + i}
+            />
           ))}
         </>
       )}

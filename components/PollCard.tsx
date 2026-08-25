@@ -1,6 +1,18 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, {
+  Easing,
+  FadeInDown,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { colors, space, type as t } from '../theme';
+import { colors, motion, space, type as t } from '../theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const easeOut = Easing.bezier(...motion.bezier.out);
 import { Card, UnreadDot } from './ui';
 import { PoolBar } from './PoolBar';
 import { CloseDate, MyPosition, StatusRow } from './PollParts';
@@ -24,12 +36,15 @@ export function PollCard({
   names,
   userId,
   unread = 0,
+  index = 0,
 }: {
   poll: PollWithBets;
   names: NameMap;
   userId: string | null;
   /** Comentarios que no viste. Sale del feed, que lo pide contado a la base. */
   unread?: number;
+  /** Lugar en el feed. Sólo escalona la entrada; no cambia nada de lo que dice. */
+  index?: number;
 }) {
   const router = useRouter();
   const pool = poolOf(poll.bets);
@@ -37,8 +52,38 @@ export function PollCard({
   const status = effectiveStatus(poll.status, poll.betting_closes_at);
   const left = timeLeft(poll.betting_closes_at);
 
+  // Se hunde menos que un botón: la tarjeta es grande y con el mismo 0,97
+  // parece que se dobla en vez de responder.
+  const press = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+
   return (
-    <Pressable onPress={() => router.push(`/poll/${poll.id}`)}>
+    <AnimatedPressable
+      onPress={() => router.push(`/poll/${poll.id}`)}
+      onPressIn={() => {
+        press.value = withTiming(motion.pressScaleCard, {
+          duration: motion.duration.press,
+          easing: easeOut,
+        });
+      }}
+      onPressOut={() => {
+        press.value = withSpring(1, motion.spring);
+      }}
+      // La entrada se escalona con el lugar en el feed: las tarjetas llegan de
+      // a una y se lee el orden —lo que vence antes está arriba—, en vez de
+      // aparecer el bloque entero de golpe cuando contesta la base. Pasadas
+      // ocho ya no se suma retraso: la novena no puede hacerse esperar medio
+      // segundo por estar novena.
+      entering={FadeInDown.duration(motion.duration.enter)
+        .easing(easeOut)
+        .delay(Math.min(index, motion.staggerCap) * motion.stagger)}
+      // Y cuando la tarjeta cambia de alto —aparece tu posición, se resuelve—
+      // el feed de abajo acompaña en vez de saltar.
+      layout={LinearTransition.duration(motion.duration.move).easing(
+        Easing.bezier(...motion.bezier.inOut),
+      )}
+      style={pressStyle}
+    >
       <Card style={{ gap: space.md }}>
         <View style={{ gap: 2 }}>
           {/* El punto va en la fila del título y no absoluto sobre la esquina:
@@ -66,7 +111,7 @@ export function PollCard({
 
         <Text style={styles.by}>por {nameOf(names, poll.creator_id)}</Text>
       </Card>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

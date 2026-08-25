@@ -29,12 +29,34 @@ export const colors = {
   accent: '#5B67D8',
   yes: '#1F6FEB',
   yesSoft: '#E3EDFD',
-  no: '#E4572E',
+  /**
+   * El lado como TEXTO sobre su propio chip. El color de relleno no sirve para
+   * eso: `yes` sobre `yesSoft` da 3,9:1 y la vara de un rótulo de 11 es 4,5.
+   * Es el escalón más oscuro del mismo tono, como el 700 de una escala frente
+   * al 600 —no un azul nuevo—: 5,0:1 sobre el chip.
+   */
+  yesInk: '#1A5FCC',
+  /**
+   * Oscurecido desde `#E4572E`, que con el rótulo blanco encima daba 3,7:1 y no
+   * llegaba a la vara: el rótulo de la barra es 13 en peso 800, que bajo WCAG
+   * es texto normal y no texto grande. Ahora da 5,2:1, y el tono se corrió de
+   * 13° a 17° —hacia el naranja, alejándose de `danger`, que está en 6°—.
+   */
+  no: '#C2410C',
   noSoft: '#FBE9E2',
-  /** Punto de "está abierta". No es un lado ni un semáforo. */
-  live: '#22C55E',
-  /** Multiplicador y retorno estimado. Tampoco es un lado. */
-  gain: '#15A34A',
+  /** El NO como texto sobre su chip, por lo mismo que `yesInk`: 5,5:1. */
+  noInk: '#A8380B',
+  /**
+   * Punto de "está abierta". No es un lado ni un semáforo. Es un gráfico y no
+   * un texto, así que su vara es 3:1 y no 4,5: `#22C55E` daba 2,3 y se perdía
+   * sobre la tarjeta blanca. Éste da 3,3.
+   */
+  live: '#16A34A',
+  /**
+   * Multiplicador y retorno estimado. Tampoco es un lado. Oscurecido desde
+   * `#15A34A`, que sobre la tarjeta daba 3,3:1 siendo texto. Mismo tono, 5,0:1.
+   */
+  gain: '#15803D',
   warn: '#8A6100',
   warnSoft: '#FFF3D6',
   danger: '#C0392B',
@@ -88,3 +110,49 @@ export const shadow = {
 
 /** Alto de los controles: botón, campo y burbuja del compositor comparten módulo. */
 export const control = { height: 50, sendSize: 46 };
+
+/**
+ * Movimiento (§Movimiento del DESIGN.md). Va acá por la misma razón que los
+ * colores: una duración suelta adentro de una pantalla es un literal, y dos
+ * pantallas que animan lo mismo a 200 y a 260 se sienten como dos apps.
+ *
+ * Las curvas no son las de fábrica. `Easing.out(Easing.ease)` es demasiado
+ * floja para que 200 ms se lean como 200 ms; éstas son las que usa la web para
+ * lo mismo, escritas como bézier.
+ */
+export const motion = {
+  duration: {
+    /** Respuesta a un dedo: apretar un botón o una tarjeta. */
+    press: 120,
+    /** Algo que aparece o desaparece: un rótulo, una píldora, un mensaje. */
+    enter: 220,
+    /** Algo que se mueve o se transforma en pantalla: la barra del pozo. */
+    move: 280,
+    /** El latido de los huesos y del punto de "abierta". */
+    beat: 750,
+  },
+  /**
+   * Escalonado de una lista. 40 ms es lo que separa una entrada de otra sin que
+   * la última se haga esperar: con diez tarjetas, la última arranca a 400 ms.
+   */
+  stagger: 40,
+  /** Tope del escalonado: pasadas ocho tarjetas ya no se suma retraso. */
+  staggerCap: 8,
+  bezier: {
+    /** Entrar y salir. Nunca `ease-in`: empieza lento justo cuando se mira. */
+    out: [0.23, 1, 0.32, 1] as const,
+    /** Moverse de un lado a otro dentro de la pantalla. */
+    inOut: [0.77, 0, 0.175, 1] as const,
+  },
+  /**
+   * Para lo que tiene que sentirse vivo y para lo que el dedo puede
+   * interrumpir. El rebote se queda abajo: arriba de 0,3 se lee de juguete.
+   */
+  spring: { damping: 18, stiffness: 260, mass: 0.7 },
+  /** El resorte del que devuelve algo a su lugar con un poco más de gracia. */
+  springPop: { damping: 12, stiffness: 320, mass: 0.6 },
+  /** Cuánto se hunde lo que se aprieta. Menos que esto no se ve. */
+  pressScale: 0.97,
+  /** La tarjeta es grande: se hunde menos, o parece que se dobla. */
+  pressScaleCard: 0.985,
+} as const;

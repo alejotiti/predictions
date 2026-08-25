@@ -1,5 +1,12 @@
+import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, radius, type as t } from '../theme';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { colors, motion, radius, type as t } from '../theme';
 import { poolPercents, totalPool, type Pool } from '../lib/domain/market';
 import { points, percent } from '../lib/format';
 
@@ -32,6 +39,26 @@ export function PoolBar({ pool, compact = false }: { pool: Pool; compact?: boole
 
   const p = poolPercents(pool);
 
+  // La balanza se reparte de nuevo, no se redibuja. Cuando alguien apuesta, el
+  // pozo cambia de lado y eso es la noticia de la pantalla: si las dos franjas
+  // saltaran a su medida nueva, el dato más importante de la app sería el único
+  // que pasa sin que se vea. Es lo único que anima moviéndose, así que va con
+  // la curva de moverse y no con la de entrar.
+  //
+  // Arranca ya en su medida: en la primera aparición la tarjeta entera entra
+  // fundiéndose, y una barra llenándose encima de eso serían dos animaciones
+  // discutiéndose el mismo momento.
+  const yesFlex = useSharedValue(p.yes);
+  useEffect(() => {
+    yesFlex.value = withTiming(p.yes, {
+      duration: motion.duration.move,
+      easing: Easing.bezier(...motion.bezier.inOut),
+    });
+  }, [p.yes, yesFlex]);
+
+  const yesStyle = useAnimatedStyle(() => ({ flex: yesFlex.value }));
+  const noStyle = useAnimatedStyle(() => ({ flex: 1 - yesFlex.value }));
+
   return (
     <View style={[styles.bar, { height: h }]}>
       {/* El lado sin un solo punto no se dibuja: no alcanza con `flex: 0`,
@@ -39,24 +66,24 @@ export function PoolBar({ pool, compact = false }: { pool: Pool; compact?: boole
           padding —una astilla de color en el borde— y la barra al 100 % no se
           lee maciza. */}
       {p.yes > 0 && (
-        <View style={[styles.half, { flex: p.yes, backgroundColor: colors.yes }]}>
+        <Animated.View style={[styles.half, { backgroundColor: colors.yes }, yesStyle]}>
           {p.yes > 0.18 && (
             <>
               <Text style={styles.sideLabel}>SÍ {percent(p.yes)}</Text>
               {!compact && <Text style={styles.sidePoints}>{points(pool.yes)}</Text>}
             </>
           )}
-        </View>
+        </Animated.View>
       )}
       {p.no > 0 && (
-        <View style={[styles.half, styles.halfNo, { flex: p.no, backgroundColor: colors.no }]}>
+        <Animated.View style={[styles.half, styles.halfNo, { backgroundColor: colors.no }, noStyle]}>
           {p.no > 0.18 && (
             <>
               <Text style={styles.sideLabel}>{percent(p.no)} NO</Text>
               {!compact && <Text style={styles.sidePoints}>{points(pool.no)}</Text>}
             </>
           )}
-        </View>
+        </Animated.View>
       )}
     </View>
   );
