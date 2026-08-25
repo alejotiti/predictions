@@ -147,31 +147,40 @@ export function Button({
   // botones ni empuja a la tarjeta. La ida es un timing corto —la respuesta al
   // dedo tiene que ser inmediata— y la vuelta un resorte, que es lo que hace
   // que soltar se sienta como soltar y no como otra animación.
+  //
+  // El desteñido de apretado también viaja acá adentro, y no en un `style` como
+  // función. Un `Pressable` normal acepta `style={({ pressed }) => ...}`, pero
+  // el animado de Reanimated NO la llama nunca: devuelve el estilo sin aplicar
+  // y el botón se queda sin fondo —blanco sobre blanco, invisible—. Es un
+  // fallo mudo, sin error en consola.
   const press = useSharedValue(1);
-  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+  const dim = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: press.value }],
+    // Deshabilitado sigue siendo opacidad y no otro color: el botón se destiñe
+    // y se lee "existe pero no ahora".
+    opacity: disabled ? 0.35 : dim.value,
+  }));
 
   return (
     <AnimatedPressable
       onPressIn={() => {
         if (disabled) return;
-        press.value = withTiming(motion.pressScale, {
-          duration: motion.duration.press,
-          easing: easeOut,
-        });
+        const timing = { duration: motion.duration.press, easing: easeOut };
+        press.value = withTiming(motion.pressScale, timing);
+        dim.value = withTiming(0.85, timing);
       }}
       onPressOut={() => {
         press.value = withSpring(1, motion.spring);
+        dim.value = withTiming(1, { duration: motion.duration.press, easing: easeOut });
       }}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
-        // Deshabilitado es opacidad, no otro color: el botón se destiñe y se
-        // lee "existe pero no ahora", que es justo lo que pasa con el lado
-        // bloqueado cuando ya apostaste del otro.
-        { backgroundColor: bg, opacity: disabled ? 0.35 : pressed ? 0.85 : 1 },
+        { backgroundColor: bg },
         tone === 'ghost' && styles.buttonGhost,
         pressStyle,
         style,

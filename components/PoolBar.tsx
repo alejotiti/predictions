@@ -29,14 +29,6 @@ export function PoolBar({ pool, compact = false }: { pool: Pool; compact?: boole
   // y peso que los rótulos de adentro de la barra llena —es el mismo renglón,
   // en el registro apagado— y nunca en versalita: eso la leería como un rótulo
   // de sección y no como el estado de la barra.
-  if (totalPool(pool) === 0) {
-    return (
-      <View style={[styles.bar, styles.emptyBar, { height: h }]}>
-        <Text style={styles.emptyLabel}>Sin apuestas todavía</Text>
-      </View>
-    );
-  }
-
   const p = poolPercents(pool);
 
   // La balanza se reparte de nuevo, no se redibuja. Cuando alguien apuesta, el
@@ -48,6 +40,12 @@ export function PoolBar({ pool, compact = false }: { pool: Pool; compact?: boole
   // Arranca ya en su medida: en la primera aparición la tarjeta entera entra
   // fundiéndose, y una barra llenándose encima de eso serían dos animaciones
   // discutiéndose el mismo momento.
+  //
+  // Los tres hooks van ACÁ ARRIBA, antes del caso de la barra vacía, y no al
+  // lado de donde se usan: una barra que se vacía o se llena cambiaría la
+  // cantidad de hooks entre un render y el siguiente, que es exactamente lo
+  // que React no permite. Con el pozo en cero `poolPercents` devuelve 50/50 y
+  // los tres quedan calculados de gusto, que no cuesta nada.
   const yesFlex = useSharedValue(p.yes);
   useEffect(() => {
     yesFlex.value = withTiming(p.yes, {
@@ -58,6 +56,14 @@ export function PoolBar({ pool, compact = false }: { pool: Pool; compact?: boole
 
   const yesStyle = useAnimatedStyle(() => ({ flex: yesFlex.value }));
   const noStyle = useAnimatedStyle(() => ({ flex: 1 - yesFlex.value }));
+
+  if (totalPool(pool) === 0) {
+    return (
+      <View style={[styles.bar, styles.emptyBar, { height: h }]}>
+        <Text style={styles.emptyLabel}>Sin apuestas todavía</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.bar, { height: h }]}>

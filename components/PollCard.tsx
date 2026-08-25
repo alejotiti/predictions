@@ -58,17 +58,12 @@ export function PollCard({
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
 
   return (
-    <AnimatedPressable
-      onPress={() => router.push(`/poll/${poll.id}`)}
-      onPressIn={() => {
-        press.value = withTiming(motion.pressScaleCard, {
-          duration: motion.duration.press,
-          easing: easeOut,
-        });
-      }}
-      onPressOut={() => {
-        press.value = withSpring(1, motion.spring);
-      }}
+    // Dos capas y no una. La entrada y el acomodo van en el envoltorio, y el
+    // hundido del dedo en el Pressable de adentro: si las tres viven en el
+    // mismo componente, la animación de layout le pisa el `transform` al
+    // apretado —Reanimated lo avisa por consola— y el hundido se pierde justo
+    // cuando la tarjeta se está reacomodando.
+    <Animated.View
       // La entrada se escalona con el lugar en el feed: las tarjetas llegan de
       // a una y se lee el orden —lo que vence antes está arriba—, en vez de
       // aparecer el bloque entero de golpe cuando contesta la base. Pasadas
@@ -82,6 +77,18 @@ export function PollCard({
       layout={LinearTransition.duration(motion.duration.move).easing(
         Easing.bezier(...motion.bezier.inOut),
       )}
+    >
+    <AnimatedPressable
+      onPress={() => router.push(`/poll/${poll.id}`)}
+      onPressIn={() => {
+        press.value = withTiming(motion.pressScaleCard, {
+          duration: motion.duration.press,
+          easing: easeOut,
+        });
+      }}
+      onPressOut={() => {
+        press.value = withSpring(1, motion.spring);
+      }}
       style={pressStyle}
     >
       <Card style={{ gap: space.md }}>
@@ -112,6 +119,7 @@ export function PollCard({
         <Text style={styles.by}>por {nameOf(names, poll.creator_id)}</Text>
       </Card>
     </AnimatedPressable>
+    </Animated.View>
   );
 }
 
