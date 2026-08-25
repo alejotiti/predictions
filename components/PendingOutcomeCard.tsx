@@ -68,7 +68,7 @@ export function PendingOutcomeCard({
       entering={FadeInDown.duration(motion.duration.enter).easing(easeOut)}
       exiting={FadeOut.duration(motion.duration.enter).easing(easeOut)}
     >
-    <Card style={{ gap: space.md }}>
+    <Card style={{ gap: space.lg }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Ver ${poll.title}`}
@@ -82,25 +82,30 @@ export function PendingOutcomeCard({
         <Text style={styles.meta}>cerró {shortDate(poll.betting_closes_at)}</Text>
       </Pressable>
 
-      <Text style={styles.ask}>¿Pasó? Lo confirma el árbitro antes de pagar.</Text>
+      {/* La pregunta, el error y los dos botones son un grupo: la pregunta
+          titula a los botones y el error habla de ellos. Adentro van juntos;
+          lo que los separa del título de arriba es el hueco grande. */}
+      <View style={{ gap: space.sm }}>
+        <Text style={styles.ask}>¿Pasó? Lo confirma el árbitro antes de pagar.</Text>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <View style={styles.actions}>
-        <Button
-          title="SÍ"
-          tone="yes"
-          style={{ flex: 1 }}
-          disabled={busy}
-          onPress={() => void choose('YES')}
-        />
-        <Button
-          title="NO"
-          tone="no"
-          style={{ flex: 1 }}
-          disabled={busy}
-          onPress={() => void choose('NO')}
-        />
+        <View style={styles.actions}>
+          <Button
+            title="SÍ"
+            tone="yes"
+            style={{ flex: 1 }}
+            disabled={busy}
+            onPress={() => void choose('YES')}
+          />
+          <Button
+            title="NO"
+            tone="no"
+            style={{ flex: 1 }}
+            disabled={busy}
+            onPress={() => void choose('NO')}
+          />
+        </View>
       </View>
     </Card>
     </Animated.View>
@@ -114,5 +119,5 @@ const styles = StyleSheet.create({
   meta: { ...t.small, fontSize: 12, color: colors.faint },
   ask: { ...t.small, color: colors.muted },
   error: { ...t.small, color: colors.danger },
-  actions: { flexDirection: 'row', gap: space.sm },
+  actions: { flexDirection: 'row', gap: space.md },
 });

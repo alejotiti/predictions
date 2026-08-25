@@ -268,3 +268,37 @@ está en 6°: al oscurecerlo, los dos rojos quedaban demasiado cerca.
 
 `faint` sigue en 2,7:1 a propósito. Es el único color que no busca la vara,
 porque es para lo que se mira de reojo y nunca lleva un dato que haga falta.
+
+## Espaciado y agrupamiento
+
+La regla es una: **el hueco entre dos grupos tiene que ser por lo menos el doble
+del que hay adentro de un grupo.** Con los dos iguales no hay grupos, hay una
+lista de cosas sueltas, y es exactamente lo que pasaba: todo iba a `space.md`
+—la página y el interior de la tarjeta, el mismo 12—.
+
+Los tres escalones que se usan:
+
+| Hueco | Valor | Para qué |
+| --- | --- | --- |
+| Adentro de un grupo | `2`–`space.sm` (8) | Un título y su fecha, el estado y su barra, un error y su botón |
+| Entre grupos | `space.lg` (16) | Los bloques de adentro de una tarjeta, y los de una pantalla |
+| Entre tarjetas | `space.xl` (24) | Tiene que ser mayor que el hueco más grande de adentro de una |
+
+Ese último renglón es el que estaba al revés: entre tarjetas había 12 y adentro
+16, así que cada tarjeta se leía más suelta por dentro que separada de la de al
+lado, y el feed perdía el ritmo.
+
+Los grupos de la tarjeta de una predicción son cuatro: la pregunta (título y
+fecha), el mercado (estado y barra, que son un dato en dos renglones), tu
+posición, y el autor. En el detalle son los mismos, con los botones como quinto.
+
+**Dos controles opuestos van a `space.md` (12), no a `space.sm`.** "Apostar SÍ"
+y "Apostar NO" a 8 de distancia se leen como un solo control partido al medio.
+El hueco es lo que dice que hay que elegir uno. Lo mismo para el SÍ y el NO del
+árbitro.
+
+Lo que **no** se tocó y es a propósito: la fila del ranking tiene 12 adentro
+(puesto, nombre, puntos) y 8 entre filas, que parece la misma inversión pero no
+lo es —el de adentro es horizontal y el de afuera vertical, son ejes distintos—.
+Un ranking es una lista densa donde la forma de la tarjeta ya agrupa, y apretarlo
+es correcto. Y "Tus grupos" ya estaba en 6 adentro y 12 afuera, que es el doble.

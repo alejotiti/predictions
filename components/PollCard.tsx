@@ -91,7 +91,12 @@ export function PollCard({
       }}
       style={pressStyle}
     >
-      <Card style={{ gap: space.md }}>
+      {/* Cuatro grupos, no cinco renglones. Antes todo iba a la misma distancia
+          —el mismo `space.md` entre el título y el estado que entre el estado y
+          la barra—, y con el hueco de adentro de un grupo igual al que lo separa
+          del siguiente no hay grupos: hay una lista de cosas. Ahora el hueco
+          entre grupos es el doble del que hay adentro de uno. */}
+      <Card style={{ gap: space.lg }}>
         <View style={{ gap: 2 }}>
           {/* El punto va en la fila del título y no absoluto sobre la esquina:
               así un título de dos líneas lo empuja en vez de pasarle por
@@ -103,9 +108,13 @@ export function PollCard({
           <CloseDate iso={poll.betting_closes_at} />
         </View>
 
-        <StatusRow status={status} left={left} pool={totalPool(pool)} compact />
-
-        <PoolBar pool={pool} compact />
+        {/* El estado y la barra son una sola cosa —cuánto hay y cómo está
+            repartido—, así que van pegados. La barra sin el pozo arriba es un
+            gráfico sin unidad. */}
+        <View style={{ gap: space.sm }}>
+          <StatusRow status={status} left={left} pool={totalPool(pool)} compact />
+          <PoolBar pool={pool} compact />
+        </View>
 
         {mine && (
           <MyPosition

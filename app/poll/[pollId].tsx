@@ -136,16 +136,24 @@ export default function PollDetail() {
       {chrome}
 
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+        {/* El título, su fecha de cierre y la descripción son una sola cosa: la
+            pregunta. Van juntos y lo que los separa de la tarjeta del mercado
+            es el hueco grande de la página. */}
         <View style={styles.head}>
-          <Text style={styles.title}>{poll.title}</Text>
-          <CloseDate iso={poll.betting_closes_at} />
+          <View style={{ gap: 2 }}>
+            <Text style={styles.title}>{poll.title}</Text>
+            <CloseDate iso={poll.betting_closes_at} />
+          </View>
+          {poll.description && <Text style={styles.desc}>{poll.description}</Text>}
         </View>
-        {poll.description && <Text style={styles.desc}>{poll.description}</Text>}
 
-        <Card style={{ gap: space.md }}>
-          <StatusRow status={status} left={left} pool={totalPool(pool)} />
-
-          <PoolBar pool={pool} />
+        <Card style={{ gap: space.lg }}>
+          {/* Igual que en la tarjeta del feed: el pozo y su reparto son un solo
+              dato en dos renglones. */}
+          <View style={{ gap: space.sm }}>
+            <StatusRow status={status} left={left} pool={totalPool(pool)} />
+            <PoolBar pool={pool} />
+          </View>
 
           {mine && (
             <MyPosition
@@ -156,6 +164,8 @@ export default function PollDetail() {
           )}
 
           {actionError && <Text style={styles.actionError}>{actionError}</Text>}
+          {/* El error queda pegado a los botones porque habla de ellos: es lo
+              que pasó al tocarlos, no un aviso de la pantalla. */}
 
           {canBet ? (
             <>
@@ -272,11 +282,17 @@ export default function PollDetail() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
-  head: { gap: 2 },
+  // Los grupos de la página van al doble del hueco que tienen adentro (8), por
+  // lo mismo que en la tarjeta del feed. Antes todo iba a 12 y la pregunta, el
+  // mercado y los comentarios se leían como tres párrafos de lo mismo.
+  page: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
+  head: { gap: space.sm },
   title: { ...t.h1, color: colors.ink },
   desc: { ...t.body, color: colors.muted },
-  actions: { flexDirection: 'row', gap: space.sm },
+  // Apostar SÍ y Apostar NO son opciones OPUESTAS, y a 8 de distancia se leían
+  // como un solo control partido al medio. El hueco es lo que dice que hay que
+  // elegir uno.
+  actions: { flexDirection: 'row', gap: space.md },
   actionError: { ...t.small, color: colors.danger },
   closed: { ...t.small, color: colors.muted },
   subjects: { ...t.small, fontSize: 12, color: colors.faint },

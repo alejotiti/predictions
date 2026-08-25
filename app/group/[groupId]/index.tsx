@@ -152,7 +152,10 @@ export default function Feed() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+  // El hueco entre tarjetas tiene que ser mayor que el más grande de adentro de
+  // una (16), o la tarjeta se lee más suelta por dentro que separada de la de
+  // al lado y el feed queda sin ritmo. Antes era 12: estaba al revés.
+  page: { padding: space.lg, gap: space.xl, paddingBottom: space.xxl },
   errorText: { ...t.body, color: colors.danger },
   adminBar: {
     flexDirection: 'row',
