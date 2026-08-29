@@ -60,17 +60,23 @@ export default function AdminPanel() {
       {loading && <AdminCardSkeleton />}
       {!loading && toApprove.length === 0 && <Text style={styles.none}>Nada pendiente.</Text>}
       {toApprove.map((p) => (
-        <Card key={p.id} style={{ gap: space.md }}>
-          <Text style={styles.title}>{p.title}</Text>
-          {p.description && <Text style={styles.desc}>{p.description}</Text>}
-          <Text style={styles.meta}>
-            de {nameOf(names, p.creator_id)} · cierra {shortDate(p.betting_closes_at)}
-          </Text>
-          {p.subject_ids.length > 0 && (
+        <Card key={p.id} style={{ gap: space.lg }}>
+          {/* La predicción: qué se pregunta y cómo se decide. */}
+          <View style={{ gap: space.xs }}>
+            <Text style={styles.title}>{p.title}</Text>
+            {p.description && <Text style={styles.desc}>{p.description}</Text>}
+          </View>
+          {/* Quién y cuándo: dos renglones del mismo registro, van pegados. */}
+          <View style={{ gap: 2 }}>
             <Text style={styles.meta}>
-              Involucra a {p.subject_ids.map((id) => nameOf(names, id)).join(', ')}
+              de {nameOf(names, p.creator_id)} · cierra {shortDate(p.betting_closes_at)}
             </Text>
-          )}
+            {p.subject_ids.length > 0 && (
+              <Text style={styles.meta}>
+                Involucra a {p.subject_ids.map((id) => nameOf(names, id)).join(', ')}
+              </Text>
+            )}
+          </View>
           <Text style={styles.criterion}>
             ¿Alguno de los involucrados puede elegir el resultado después de ver la apuesta?
             Si puede elegirlo, rechazala. Si solo puede influir, aprobala.
@@ -100,11 +106,13 @@ export default function AdminPanel() {
         const pool = poolOf(p.bets);
         const n = p.bets.length;
         return (
-          <Card key={p.id} style={{ gap: space.md }}>
-            <Text style={styles.title}>{p.title}</Text>
-            <Text style={styles.meta}>
-              {points(totalPool(pool))} pts de {n} {n === 1 ? 'apuesta' : 'apuestas'}
-            </Text>
+          <Card key={p.id} style={{ gap: space.lg }}>
+            <View style={{ gap: space.xs }}>
+              <Text style={styles.title}>{p.title}</Text>
+              <Text style={styles.meta}>
+                {points(totalPool(pool))} pts de {n} {n === 1 ? 'apuesta' : 'apuestas'}
+              </Text>
+            </View>
             {p.proposed_outcome && (
               <Pill
                 text={`${p.proposed_by ? nameOf(names, p.proposed_by) : 'Alguien'} propone ${
@@ -113,6 +121,7 @@ export default function AdminPanel() {
                 tone={p.proposed_outcome === 'YES' ? 'yes' : 'no'}
               />
             )}
+            <View style={{ gap: space.md }}>
             <View style={styles.actions}>
               {(['YES', 'NO'] as Side[]).map((side) => (
                 <Button
@@ -131,6 +140,7 @@ export default function AdminPanel() {
               disabled={busy === p.id}
               onPress={() => run(p.id, () => resolvePoll(p.id, 'VOID'))}
             />
+            </View>
           </Card>
         );
       })}
@@ -139,7 +149,8 @@ export default function AdminPanel() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+  // Mismo criterio que el feed: entre tarjetas, más aire que adentro de una.
+  page: { padding: space.lg, gap: space.xl, paddingBottom: space.xxl },
   title: { ...t.title, color: colors.ink },
   desc: { ...t.small, color: colors.muted },
   meta: { ...t.small, fontSize: 12, color: colors.faint },
@@ -152,7 +163,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     lineHeight: 17,
   },
-  actions: { flexDirection: 'row', gap: space.sm },
+  actions: { flexDirection: 'row', gap: space.md },
   none: { ...t.small, color: colors.faint },
   errorText: { ...t.body, color: colors.danger },
 });

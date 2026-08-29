@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { colors, control, radius, space, type as t } from '../theme';
+import Animated, { Easing, FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { colors, control, motion, radius, space, type as t } from '../theme';
+
+const easeOut = Easing.bezier(...motion.bezier.out);
 import { PaperAirplaneIcon } from './icons';
 import { sendPollMessage } from '../lib/predictions';
 import { nameOf, type NameMap } from '../lib/profiles';
@@ -25,20 +28,36 @@ export function ChatMessages({
   userId: string | null;
 }) {
   return (
-    <View style={{ gap: space.md }}>
+    <Animated.View
+      // El hilo se acomoda cuando entra un mensaje en vez de reencuadrarse de un
+      // corte: el que ya estaba leyendo no pierde el renglón.
+      layout={LinearTransition.duration(motion.duration.move).easing(
+        Easing.bezier(...motion.bezier.inOut),
+      )}
+      style={{ gap: space.md }}
+    >
       {messages.length === 0 && (
         <Text style={styles.empty}>Nadie dijo nada todavía. Empezá vos.</Text>
       )}
-      {messages.map((m) => {
+      {messages.map((m, i) => {
         const own = m.user_id === userId;
         return (
-          <View key={m.id} style={[styles.bubble, own && styles.bubbleOwn]}>
+          <Animated.View
+            key={m.id}
+            // Sube desde abajo, que es de donde vienen: del compositor si es
+            // tuyo, del final del hilo si es de otro. Escalonado al cargar, para
+            // que la conversación se lea llegando y no pegada de golpe.
+            entering={FadeInDown.duration(motion.duration.enter)
+              .easing(easeOut)
+              .delay(Math.min(i, motion.staggerCap) * motion.stagger)}
+            style={[styles.bubble, own && styles.bubbleOwn]}
+          >
             {!own && <Text style={styles.author}>{nameOf(names, m.user_id)}</Text>}
             <Text style={[styles.body, own && { color: '#fff' }]}>{m.body}</Text>
-          </View>
+          </Animated.View>
         );
       })}
-    </View>
+    </Animated.View>
   );
 }
 

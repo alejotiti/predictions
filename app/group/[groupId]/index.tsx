@@ -117,8 +117,15 @@ export default function Feed() {
       {status === 'ready' && live.length === 0 && toAnswer.length === 0 && (
         <Empty title="No hay predicciones abiertas" hint="Creá la primera desde la pestaña Crear." />
       )}
-      {live.map((p) => (
-        <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
+      {live.map((p, i) => (
+        <PollCard
+          key={p.id}
+          poll={p}
+          names={names}
+          userId={userId}
+          unread={unread[p.id] ?? 0}
+          index={i}
+        />
       ))}
 
       {done.length > 0 && (
@@ -126,8 +133,17 @@ export default function Feed() {
           <View style={styles.section}>
             <Label>Historial</Label>
           </View>
-          {done.map((p) => (
-            <PollCard key={p.id} poll={p} names={names} userId={userId} unread={unread[p.id] ?? 0} />
+          {done.map((p, i) => (
+            <PollCard
+              key={p.id}
+              poll={p}
+              names={names}
+              userId={userId}
+              unread={unread[p.id] ?? 0}
+              // El historial sigue escalonando desde donde terminó el feed vivo,
+              // así la lista entera se lee como una sola caída y no como dos.
+              index={live.length + i}
+            />
           ))}
         </>
       )}
@@ -136,7 +152,10 @@ export default function Feed() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+  // El hueco entre tarjetas tiene que ser mayor que el más grande de adentro de
+  // una (16), o la tarjeta se lee más suelta por dentro que separada de la de
+  // al lado y el feed queda sin ritmo. Antes era 12: estaba al revés.
+  page: { padding: space.lg, gap: space.xl, paddingBottom: space.xxl },
   errorText: { ...t.body, color: colors.danger },
   adminBar: {
     flexDirection: 'row',

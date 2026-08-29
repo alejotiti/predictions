@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, { Easing, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { colors, space, type as t } from '../theme';
+import { colors, motion, space, type as t } from '../theme';
+
+const easeOut = Easing.bezier(...motion.bezier.out);
 import { Button, Card, UnreadDot } from './ui';
 import { proposeOutcome } from '../lib/predictions';
 import { shortDate } from '../lib/format';
@@ -57,7 +60,15 @@ export function PendingOutcomeCard({
   }
 
   return (
-    <Card style={{ gap: space.md }}>
+    // Entra antes que el feed y sin esperar turno: es lo único de la pantalla
+    // donde el que tiene que hacer algo sos vos. Y se va fundiéndose cuando
+    // contestás, que es la confirmación de que quedó contestada —el feed de
+    // abajo sube solo a ocupar el lugar.
+    <Animated.View
+      entering={FadeInDown.duration(motion.duration.enter).easing(easeOut)}
+      exiting={FadeOut.duration(motion.duration.enter).easing(easeOut)}
+    >
+    <Card style={{ gap: space.lg }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Ver ${poll.title}`}
@@ -71,27 +82,33 @@ export function PendingOutcomeCard({
         <Text style={styles.meta}>cerró {shortDate(poll.betting_closes_at)}</Text>
       </Pressable>
 
-      <Text style={styles.ask}>¿Pasó? Lo confirma el árbitro antes de pagar.</Text>
+      {/* La pregunta, el error y los dos botones son un grupo: la pregunta
+          titula a los botones y el error habla de ellos. Adentro van juntos;
+          lo que los separa del título de arriba es el hueco grande. */}
+      <View style={{ gap: space.sm }}>
+        <Text style={styles.ask}>¿Pasó? Lo confirma el árbitro antes de pagar.</Text>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <View style={styles.actions}>
-        <Button
-          title="SÍ"
-          tone="yes"
-          style={{ flex: 1 }}
-          disabled={busy}
-          onPress={() => void choose('YES')}
-        />
-        <Button
-          title="NO"
-          tone="no"
-          style={{ flex: 1 }}
-          disabled={busy}
-          onPress={() => void choose('NO')}
-        />
+        <View style={styles.actions}>
+          <Button
+            title="SÍ"
+            tone="yes"
+            style={{ flex: 1 }}
+            disabled={busy}
+            onPress={() => void choose('YES')}
+          />
+          <Button
+            title="NO"
+            tone="no"
+            style={{ flex: 1 }}
+            disabled={busy}
+            onPress={() => void choose('NO')}
+          />
+        </View>
       </View>
     </Card>
+    </Animated.View>
   );
 }
 
@@ -102,5 +119,5 @@ const styles = StyleSheet.create({
   meta: { ...t.small, fontSize: 12, color: colors.faint },
   ask: { ...t.small, color: colors.muted },
   error: { ...t.small, color: colors.danger },
-  actions: { flexDirection: 'row', gap: space.sm },
+  actions: { flexDirection: 'row', gap: space.md },
 });
